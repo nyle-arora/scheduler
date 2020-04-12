@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import 'rbx/index.css';
 import { Button, Container, Title } from 'rbx';
 
-
 const schedule = {
   "title": "CS Courses for 2018-2019",
   "courses": [
@@ -43,37 +42,67 @@ const getCourseNumber = course => (
     course.id.slice(1, 4)
 )
 
+const buttonState = selected => (
+    selected ? `button is-success is-selected` : 'button'
+);
+
+const TermSelector = ({ state }) => (
+    <div className="field has-addons">
+      { Object.values(terms)
+          .map(value =>
+              <button key={value}
+                      className={ buttonState(value === state.term) }
+                      onClick={ () => state.setTerm(value) }
+              >
+                { value }
+              </button>
+          )
+      }
+    </div>
+);
+
 const Course = ({ course }) => (
     <Button>
       { getCourseTerm(course) } CS { getCourseNumber(course) }: { course.title }
     </Button>
 );
 
-const CourseList = ({ courses }) => (
-    <Button.Group>
-      {courses.map(course => <Course key={course.id} course={ course } />)}
-    </Button.Group>
-);
+const CourseList = ({ courses }) => {
+  const [term, setTerm] = React.useState('Fall');
+  const termCourses = courses.filter(course => term === getCourseTerm(course));
+
+  return (
+      <React.Fragment>
+        <TermSelector state={ { term, setTerm } } />
+        <div className="buttons">
+          { termCourses.map(course =>
+              <Course key={ course.id } course={ course }  />) }
+        </div>
+      </React.Fragment>
+  );
+};
 
 const App = () => {
-  const [schedule, setSchedule] = useState({ title: '', courses: [] });
+  const [schedule, setSchedule] = React.useState({ title: '', courses: [] });
   const url = 'https://courses.cs.northwestern.edu/394/data/cs-courses.php';
 
-  useEffect(() => {
+  React.useEffect(() => {
+
     const fetchSchedule = async () => {
       const response = await fetch(url);
       if (!response.ok) throw response;
       const json = await response.json();
       setSchedule(json);
     }
+
     fetchSchedule();
-  }, [])
+  }, []);
 
   return (
-      <Container>
+      <div className="container">
         <Banner title={ schedule.title } />
         <CourseList courses={ schedule.courses } />
-      </Container>
+      </div>
   );
 };
 
