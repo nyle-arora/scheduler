@@ -1,6 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import 'rbx/index.css';
 import { Button, Container, Title } from 'rbx';
+import firebase from 'firebase/app';
+import 'firebase/database';
+
+const firebaseConfig = {
+  apiKey: "...",
+  authDomain: "...",
+  databaseURL: "...",
+  projectId: "...",
+  storageBucket: "....",
+  messagingSenderId: "...",
+  appId: "..."
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database().ref();
 
 const schedule = {
   "title": "CS Courses for 2018-2019",
@@ -61,8 +76,25 @@ const TermSelector = ({ state }) => (
     </div>
 );
 
-const Course = ({ course }) => (
-    <Button>
+const saveCourse = (course, meets) => {
+  db.child('courses').child(course.id).update({meets})
+      .catch(error => alert(error));
+};
+
+const moveCourse = course => {
+  const meets = prompt('Enter new meeting data, in this format:', course.meets);
+  if (!meets) return;
+  const {days} = timeParts(meets);
+  if (days) saveCourse(course, meets);
+  else moveCourse(course);
+};
+
+const Course = ({ course, state }) => (
+    <Button color={ buttonColor(state.selected.includes(course)) }
+            onClick={ () => state.toggle(course) }
+            onDoubleClick={ () => moveCourse(course) }
+            disabled={ hasConflict(course, state.selected) }
+    >
       { getCourseTerm(course) } CS { getCourseNumber(course) }: { course.title }
     </Button>
 );
@@ -82,27 +114,31 @@ const CourseList = ({ courses }) => {
   );
 };
 
+const addScheduleTimes = schedule => ({
+  title: schedule.title,
+  courses: Object.values(schedule.courses).map(addCourseTimes)
+});
+
+db.on('value', snap => {
+  if (snap.val()) setSchedule(addScheduleTimes(snap.val()));
+}, error => alert(error));
+
 const App = () => {
-  const [schedule, setSchedule] = React.useState({ title: '', courses: [] });
-  const url = 'https://courses.cs.northwestern.edu/394/data/cs-courses.php';
+  const [schedule, setSchedule] = useState({ title: '', courses: [] });
 
-  React.useEffect(() => {
-
-    const fetchSchedule = async () => {
-      const response = await fetch(url);
-      if (!response.ok) throw response;
-      const json = await response.json();
-      setSchedule(json);
+  useEffect(() => {
+    const handleData = snap => {
+      if (snap.val()) setSchedule(addScheduleTimes(snap.val()));
     }
-
-    fetchSchedule();
+    db.on('value', handleData, error => alert(error));
+    return () => { db.off('value', handleData); };
   }, []);
 
   return (
-      <div className="container">
+      <Container>
         <Banner title={ schedule.title } />
         <CourseList courses={ schedule.courses } />
-      </div>
+      </Container>
   );
 };
 
